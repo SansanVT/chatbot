@@ -6,7 +6,7 @@ load_dotenv()
 API_KEY = os.getenv("GOOGLE_API_KEY")
 
 if not API_KEY:
-    raise ValueError("❌ ERROR: No se encontró la GOOGLE_API_KEY en el archivo .env")
+    raise ValueError("ERROR: No se encontró la GOOGLE_API_KEY en el archivo .env")
 
 genai.configure(api_key=API_KEY)
 
@@ -29,5 +29,5 @@ async def obtener_respuesta_gemini(texto_usuario: str):
         response = chat.send_message(texto_usuario)
         return response.text
     except Exception as e:
-        print(f"🔥 Error en Gemini: {e}")
+        print(f"Error en Gemini: {e}")
         return "Lo siento, mis neuronas están desconectadas momentáneamente. Intenta de nuevo."

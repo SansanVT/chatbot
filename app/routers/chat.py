@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from app.services.rag_service import buscar_informacion 
-# Importamos el escudo desde el main
+from fastapi import Depends
+from app.dependencies import verificar_token
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -13,7 +14,7 @@ class PreguntaUsuario(BaseModel):
     usuario_id: str
     prompt_maestro: str  
 
-@router.post("/chat/enviar")
+@router.post("/chat/enviar", dependencies=[Depends(verificar_token)])
 @limiter.limit("15/minute")
 async def conversar(request: Request, entrada: PreguntaUsuario):
     try:

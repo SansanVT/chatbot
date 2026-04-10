@@ -21,8 +21,6 @@ import google.generativeai as genai
 load_dotenv()
 API_KEY = os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=API_KEY)
-
-# Configuración Global de LlamaIndex
 Settings.llm = Gemini(api_key=API_KEY, model_name="models/gemini-2.5-flash-lite")
 Settings.embed_model = GeminiEmbedding(api_key=API_KEY, model_name="models/gemini-embedding-001")
 
@@ -32,17 +30,15 @@ class GeminiImageReader(BaseReader):
     """Lector personalizado que usa Gemini Vision en lugar de Tesseract"""
     def load_data(self, file, extra_info=None):
         try:
-            print(f"👀 Gemini está leyendo la imagen: {file}")
+            print(f"Gemini está leyendo la imagen: {file}")
             img = PIL.Image.open(file)
-            
-            # CORRECCIÓN: Usamos el modelo 2.5-flash que ya vimos que tu API Key acepta sin problemas
             model = genai.GenerativeModel('models/gemini-2.5-flash-lite') 
             
             prompt = "Extrae todo el texto de esta imagen de forma estructurada. Incluye fechas, requisitos, promedios y lugares exactamente como aparecen."
             response = model.generate_content([prompt, img])
             return [Document(text=response.text, extra_info=extra_info or {})]
         except Exception as e:
-            print(f"⚠️ Error leyendo imagen con Gemini: {e}")
+            print(f"Error leyendo imagen con Gemini: {e}")
             return []
 
 class UTTECBrain:
@@ -61,7 +57,6 @@ class UTTECBrain:
         archivos_en_carpeta = os.listdir(RAW_FILES_DIR)
 
         try:
-            # CORRECCIÓN DEFINITIVA: Usamos nuestro propio lector con Gemini
             image_reader = GeminiImageReader()
             
             file_extractor = {
@@ -87,9 +82,7 @@ class UTTECBrain:
                     )
                 ))
         except Exception as e:
-            print(f"ℹ️ Info Motor Vectorial: No se encontraron PDFs/TXTs/Imágenes o hubo un detalle: {e}")
-
-        # 2. MOTOR TABULAR (Para maestro_alumnos.csv)
+            print(f"Info Motor Vectorial: No se encontraron PDFs/TXTs/Imágenes o hubo un detalle: {e}")
         archivos_csv = [f for f in archivos_en_carpeta if f.endswith('.csv')]
         if archivos_csv:
             try:
@@ -102,7 +95,6 @@ class UTTECBrain:
                         df['Matricula'] = df['Matricula'].astype(str).str.strip()
                         
                     if not df.empty:
-                        # CAMBIO: Instrucción más estricta al PandasQueryEngine
                         instruccion_pandas = (
                             "Eres un experto en Python y Pandas. Tu única tarea es generar código para filtrar el dataframe 'df'.\n"
                             "COLUMNAS REALES DISPONIBLES: ['Matricula', 'Nombre del Alumno', 'Grupo Ingles', 'Docente', 'Horario', 'Salon', 'Codigo Classroom', 'Codigo Oxford', 'Grado', 'Nivel'].\n"
@@ -118,7 +110,7 @@ class UTTECBrain:
                         pandas_engine = PandasQueryEngine(
                             df=df, 
                             verbose=False, 
-                            synthesize_response=False,  # CAMBIO: Desactivar síntesis para obtener datos crudos
+                            synthesize_response=False,
                             instruction_str=instruccion_pandas
                         )
                         
@@ -130,19 +122,17 @@ class UTTECBrain:
                             )
                         ))
             except Exception as e:
-                print(f"⚠️ Error cargando el archivo CSV: {e}")
+                print(f"Error cargando el archivo CSV: {e}")
 
         if tools:
             self.router_engine = RouterQueryEngine(
                 selector=LLMSingleSelector.from_defaults(),
                 query_engine_tools=tools
             )
-            print("✅ Cerebro actualizado y listo.")
+            print("Cerebro actualizado y listo.")
         else:
             self.router_engine = None
-            print("⚠️ El cerebro está vivo, pero no tiene documentos para leer.")
-
-    # NUEVA FUNCIÓN: Búsqueda directa en DataFrame (sin alucinaciones)
+            print("El cerebro está vivo, pero no tiene documentos para leer.")
     def buscar_en_csv(self, criterio: str, valor: str) -> dict:
         """
         Búsqueda directa en el CSV sin usar LLM.
@@ -172,8 +162,6 @@ class UTTECBrain:
             
             if resultado.empty:
                 return {"encontrado": False, "datos": None, "mensaje": f"No se encontraron resultados para {criterio}: {valor}"}
-            
-            # Convertir a dict manteniendo NaN como "No asignado"
             datos = resultado.to_dict('records')
             for registro in datos:
                 for key, val in registro.items():
@@ -213,18 +201,13 @@ def _extraer_matricula_de_contexto(pregunta: str, historial: str) -> str:
 
 def buscar_informacion(pregunta: str, usuario_id: str, prompt_maestro: str):
     """Maneja la lógica de la sesión y la respuesta inteligente."""
-    
-    # 1. INICIALIZAR SESIÓN SI NO EXISTE
     if usuario_id not in memoria_sesiones:
         memoria_sesiones[usuario_id] = {
             "historial": [],
-            "estudiante_datos": None, # Aquí guardaremos la fila del alumno una vez encontrada
+            "estudiante_datos": None,
             "nombre_alumno": None
         }
-    
     sesion = memoria_sesiones[usuario_id]
-    
-    # 2. INTENTAR IDENTIFICAR AL ALUMNO (Solo si no lo hemos identificado ya)
     if not sesion["estudiante_datos"]:
         matricula = _extraer_matricula_de_contexto(pregunta, str(sesion["historial"]))
         
@@ -234,15 +217,12 @@ def buscar_informacion(pregunta: str, usuario_id: str, prompt_maestro: str):
                 sesion["estudiante_datos"] = resultado["datos"][0]
                 sesion["nombre_alumno"] = sesion["estudiante_datos"]["Nombre del Alumno"]
         else:
-            # Si no hay matrícula, intentamos por nombre (solo si la pregunta parece un nombre)
             if len(pregunta.split()) >= 2: 
                 resultado = brain.buscar_en_csv('nombre', pregunta)
                 if resultado["encontrado"] and resultado["cantidad"] == 1:
                     sesion["estudiante_datos"] = resultado["datos"][0]
                     sesion["nombre_alumno"] = sesion["estudiante_datos"]["Nombre del Alumno"]
 
-    # 3. CONSTRUIR EL CONTEXTO PARA LA IA
-    # Si tenemos al estudiante, le pasamos sus datos. Si no, le decimos que no lo tenemos.
     if sesion["estudiante_datos"]:
         contexto_datos = "DATOS DEL ALUMNO IDENTIFICADO:\n"
         for k, v in sesion["estudiante_datos"].items():
@@ -251,8 +231,6 @@ def buscar_informacion(pregunta: str, usuario_id: str, prompt_maestro: str):
     else:
         contexto_datos = "EL ALUMNO AÚN NO HA SIDO IDENTIFICADO."
         status_identificacion = "DEBES PEDIR LA MATRÍCULA AMABLEMENTE."
-
-    # 4. PREPARAR EL PROMPT FINAL (Eliminamos redundancia)
     texto_historial = "\n".join([f"A: {i['pregunta']}\nB: {i['respuesta']}" for i in sesion["historial"][-3:]])
     
     instruccion_dinamica = (
@@ -269,20 +247,16 @@ def buscar_informacion(pregunta: str, usuario_id: str, prompt_maestro: str):
     )
 
     try:
-        # 5. GENERAR RESPUESTA
-        # Si la pregunta es general (ej. becas), el router sigue funcionando
         if not sesion["estudiante_datos"] and "beca" in pregunta.lower():
              respuesta_ai = brain.router_engine.query(pregunta)
              texto_final = str(respuesta_ai)
         else:
              respuesta_ai = Settings.llm.complete(instruccion_dinamica)
              texto_final = respuesta_ai.text
-
-        # 6. GUARDAR EN HISTORIAL
         sesion["historial"].append({"pregunta": pregunta, "respuesta": texto_final})
         
         return {"respuesta": texto_final, "is_recognized": True}
 
     except Exception as e:
-        print(f"🔥 Error: {e}")
+        print(f"Error: {e}")
         return {"respuesta": "Hoo-hoo... Me dio un pequeño mareo. ¿Podrías repetirme eso?", "is_recognized": False}

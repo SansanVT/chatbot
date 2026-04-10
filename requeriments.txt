@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+python-dotenv
+pandas
+llama-index-core
+llama-index-llms-gemini
+llama-index-embeddings-gemini
+llama-index-readers-file
+llama-index-experimental
+google-generativeai
+Pillow
+slowapi
+mistralai==1.8.2
+llama-index-llms-mistralai==0.7.1
+polars
+python-multipart
